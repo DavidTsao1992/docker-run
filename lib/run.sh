@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # Build and execute the `docker run` that a language runner needs.
 #
-# The shape is crun.d's, and it is the right shape: mount the working directory
-# at its own absolute path and run as the host's uid. Editing inside the
-# container edits the real files, and nothing lands owned by root.
+# Mount the working directory at its own absolute path and run as the host's uid.
+# Editing inside the container edits the real files, and nothing lands owned by
+# root.
 #
-# Where this deliberately differs from crun.d: crun.d throws away whatever the
-# run installed, so `pip install` has to happen again every time. The goal here
-# is to pin a project's packages, so installs go into .venv / node_modules in
-# the project directory and stay there. The container is disposable; the
-# environment it builds is not.
+# A container run normally discards whatever it installed, which would mean
+# `pip install` again on every invocation. The goal here is to pin a project's
+# packages, so installs go into .venv / node_modules in the project directory and
+# stay there. The container is disposable; the environment it builds is not.
 
 set -euo pipefail
 
@@ -59,7 +58,7 @@ dr_docker_args() {
     -e "npm_config_cache=/cache/npm"
   )
 
-  # Optional per-directory extras, same idea as crun.d's dotfiles.
+  # Optional per-directory extras, read from dotfiles beside the code.
   [ -f .docker-run.env ] && DR_ARGS+=(--env-file .docker-run.env)
   if [ -f .docker-run.ports ]; then
     local p
