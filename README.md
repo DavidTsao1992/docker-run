@@ -4,9 +4,10 @@ Run Python and TypeScript in Docker, with each project's packages pinned to that
 project's directory. No pyenv, no nvm, no version managers on the host — the only
 thing you install is Docker.
 
-The idea is [crun.d](https://github.com/davidsiaw/crun.d)'s: mount the working
-directory into a container at its own absolute path, run as your own uid, and let
-the container be the disposable part. This differs in one deliberate way, below.
+The working directory is mounted into the container at its own absolute path and
+the container runs as your uid, so editing inside it edits the real files and
+nothing lands owned by root. The container is the disposable part; what it builds
+in the project directory is not.
 
 ```bash
 ./install.sh          # puts bin/ on PATH
@@ -27,8 +28,9 @@ ts script.ts          # run TypeScript directly — no build step, no tsconfig n
 
 ## The environment persists; the container does not
 
-crun.d throws away whatever a run installed, so `pip install` has to happen every
-time. Here installs land in the project directory and stay:
+A container run normally discards whatever it installed, which would mean
+`pip install` every single time. Here installs land in the project directory and
+stay:
 
 | | Python | TypeScript |
 |---|---|---|
@@ -40,10 +42,9 @@ time. Here installs land in the project directory and stay:
 edit it and run `pi`. Syncing on every `py` instead would put a pip resolve in
 front of every command, including `py -c 'print(1)'`.
 
-`pi` is crun.d's command with crun.d's meaning — bare `pi` installs
-`requirements.txt` — and also takes package names. There is deliberately no bare
-`pip` on `PATH`: that would shadow the system pip in every directory, including
-ones where you want nothing to do with a container.
+Bare `pi` installs `requirements.txt`; given package names it installs those.
+There is deliberately no bare `pip` on `PATH`: that would shadow the system pip in
+every directory, including ones where you want nothing to do with a container.
 
 `node_modules` rather than something venv-shaped because node already keeps
 packages per directory — anything else would be fighting npm instead of using it.

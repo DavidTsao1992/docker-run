@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pi [packages...] — install into this directory's .venv.
 #
-#   pi                  install requirements.txt   (crun.d's `pi`, same meaning)
+#   pi                  install requirements.txt
 #   pi requests httpx   install those packages
 #
 # requirements.txt is installed for you when .venv is first created. This is for
