@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# ni [packages...] — install into this directory's node_modules.
+#
+#   ni                  install package.json      (pi's counterpart)
+#   ni zod date-fns     install those packages
+#
+# package.json is installed for you when node_modules is first created. This is
+# for afterwards, and it exists because the asymmetry was real: `pi` handled the
+# Python side while TypeScript had no way to pick up a changed package.json short
+# of deleting node_modules.
+#
+# Not a bare `npm` on PATH, for the same reason there is no bare `pip`: it would
+# shadow the host's npm in every directory, including ones where a container has
+# no business being involved.
+
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/run.sh"
+
+version="$(dr_setting .node-version .nvmrc 2>/dev/null || echo "${NODE_VERSION:-22}")"
+version="${version#v}"
+image="node:${version}-slim"
+
+read -r -d '' script <<'SCRIPT' || true
+set -euo pipefail
+if [ "$#" -eq 0 ]; then
+  if [ ! -f package.json ]; then
+    echo "ni: no package.json here, and no packages named." >&2
+    echo "    ni <package>...   to install something specific" >&2
+    exit 2
+  fi
+  echo "docker-run: installing package.json" >&2
+  exec npm install
+fi
+exec npm install "$@"
+SCRIPT
+
+dr_exec "$image" "$script" "$@"
