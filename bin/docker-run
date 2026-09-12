@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# docker-run doctor — say which engine is in play and whether it actually works.
+#
+# "Configured" and "working" are different, and the gap between them is where
+# the confusing failures live: a daemon can answer `docker version` while its
+# path to the registry is dead, which looks like a broken build rather than a
+# broken daemon. doctor pulls something, because that is the cheapest thing that
+# exercises the whole path.
+
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/run.sh"
+
+case "${1:-doctor}" in
+  doctor)
+    engine="$(dr_use_engine)" || exit 1
+    echo "engine:  $engine"
+    docker version --format '  server:  {{.Server.Version}} via context {{.Client.Context}}'
+    printf '  pull:    '
+    if timeout 120 docker pull --quiet alpine >/dev/null 2>&1; then
+      echo "ok"
+    else
+      echo "FAILED — the daemon answers but cannot reach the registry."
+      echo "           Try: docker pull alpine"
+      exit 1
+    fi
+    printf '  cwd:     '
+    case "$PWD" in
+      "$HOME"/*|"$HOME") echo "$PWD (under \$HOME — shared with the VM)" ;;
+      *) echo "$PWD (may not be shared with the VM; py/ts will check and say so)" ;;
+    esac
+    echo "  cache:   ${DOCKER_RUN_CACHE:-$HOME/.cache/docker-run}"
+    ;;
+  *)
+    echo "usage: docker-run doctor" >&2; exit 2 ;;
+esac

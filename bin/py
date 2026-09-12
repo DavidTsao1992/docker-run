@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# py [args...] — run python in a container, against this directory's .venv.
+#
+#   py                  REPL
+#   py script.py        run a script
+#   py -m pytest        any python -m ...
+#
+# The .venv lives in the project directory and persists, which is the point:
+# `py -m pip install requests` once, and every later `py` in this directory has
+# it. The container is thrown away; the environment is not.
+#
+# Version comes from .python-version if present, else 3.12.
+
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/run.sh"
+
+version="$(dr_setting .python-version .python.version 2>/dev/null || echo "${PYTHON_VERSION:-3.12}")"
+image="python:${version}-slim"
+
+# requirements.txt is installed only when the venv is first created. Doing it on
+# every run would add a pip resolve to the start of every single command; if you
+# change requirements, `py -m pip install -r requirements.txt` is the explicit
+# way to pick it up, and `rm -rf .venv` is the sledgehammer.
+read -r -d '' script <<'SCRIPT' || true
+set -euo pipefail
+
+# A venv is bound to one minor version: its packages live in
+# lib/pythonX.Y/site-packages, while bin/python is a symlink that follows
+# whatever the image provides. Change .python-version and the interpreter moves
+# but the packages do not — every import fails with ModuleNotFoundError and
+# nothing says why. Stamp the version and rebuild when it moves.
+want="$(python -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+stamp=".venv/.docker-run-python"
+if [ -x .venv/bin/python ] && [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
+  echo "docker-run: python $(cat "$stamp" 2>/dev/null || echo unknown) -> $want, rebuilding .venv" >&2
+  echo "docker-run: requirements.txt will be reinstalled; anything installed ad-hoc is lost" >&2
+  rm -rf .venv
+fi
+
+if [ ! -x .venv/bin/python ]; then
+  echo "docker-run: creating .venv (python $(python --version 2>&1 | cut -d" " -f2))" >&2
+  python -m venv .venv
+  .venv/bin/pip install --quiet --upgrade pip
+  if [ -f requirements.txt ]; then
+    echo "docker-run: installing requirements.txt" >&2
+    .venv/bin/pip install --quiet -r requirements.txt
+  fi
+  echo "$want" > "$stamp"
+fi
+export PATH="$PWD/.venv/bin:$PATH"
+exec .venv/bin/python "$@"
+SCRIPT
+
+dr_exec "$image" "$script" "$@"

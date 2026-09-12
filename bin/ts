@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# ts [args...] — run TypeScript in a container, against this directory's node_modules.
+#
+#   ts                  REPL (via tsx)
+#   ts script.ts        run a .ts file directly — no build step, no tsconfig needed
+#
+# node_modules/ is the TypeScript half of the .venv idea, and it is deliberately
+# not something invented: node already keeps packages per directory, so anything
+# else would fight npm rather than use it. It persists in the project the same
+# way .venv does.
+#
+# tsx rather than ts-node or a tsc build: it runs a .ts file as given, which is
+# what "run this script" should mean. It is installed into the project's own
+# node_modules on first use, so the version is pinned per project like everything
+# else here.
+#
+# Version comes from .node-version or .nvmrc if present, else 22.
+
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/run.sh"
+
+version="$(dr_setting .node-version .nvmrc 2>/dev/null || echo "${NODE_VERSION:-22}")"
+version="${version#v}"
+image="node:${version}-slim"
+
+read -r -d '' script <<'SCRIPT' || true
+set -euo pipefail
+if [ -f package.json ] && [ ! -d node_modules ]; then
+  echo "docker-run: installing package.json" >&2
+  npm install --silent
+fi
+if [ ! -x node_modules/.bin/tsx ]; then
+  echo "docker-run: installing tsx into node_modules" >&2
+  npm install --silent --no-save tsx
+fi
+exec node_modules/.bin/tsx "$@"
+SCRIPT
+
+dr_exec "$image" "$script" "$@"
