@@ -122,3 +122,41 @@ $script"
   fi
   exec docker "${DR_ARGS[@]}" bash -lc "$script" docker-run "$@"
 }
+
+# The shell that makes sure .venv exists and matches the image's python. Shared
+# by py and pi: two copies of the version-stamp rule would drift, and that rule
+# is the one thing standing between a changed .python-version and a venv whose
+# packages have silently stopped existing.
+dr_venv_prep() {
+  cat <<'PREP'
+set -euo pipefail
+
+# A venv is bound to one minor version: its packages live in
+# lib/pythonX.Y/site-packages, while bin/python is a symlink that follows
+# whatever the image provides. Change .python-version and the interpreter moves
+# but the packages do not — every import fails with ModuleNotFoundError and
+# nothing says why. Stamp the version and rebuild when it moves.
+want="$(python -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+stamp=".venv/.docker-run-python"
+if [ -x .venv/bin/python ] && [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
+  echo "docker-run: python $(cat "$stamp" 2>/dev/null || echo unknown) -> $want, rebuilding .venv" >&2
+  echo "docker-run: requirements.txt will be reinstalled; anything installed ad-hoc is lost" >&2
+  rm -rf .venv
+fi
+
+if [ ! -x .venv/bin/python ]; then
+  echo "docker-run: creating .venv (python $(python --version 2>&1 | cut -d" " -f2))" >&2
+  python -m venv .venv
+  .venv/bin/pip install --quiet --upgrade pip
+  if [ -f requirements.txt ]; then
+    echo "docker-run: installing requirements.txt" >&2
+    .venv/bin/pip install --quiet -r requirements.txt
+  fi
+  echo "$want" > "$stamp"
+fi
+# Ends here on purpose: this prepares the venv and hands control back. Each
+# command appends its own exec — py runs python, pi runs pip. An exec left in
+# here would mean pi never reached its own body.
+export PATH="$PWD/.venv/bin:$PATH"
+PREP
+}

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# pi [packages...] — install into this directory's .venv.
+#
+#   pi                  install requirements.txt   (crun.d's `pi`, same meaning)
+#   pi requests httpx   install those packages
+#
+# requirements.txt is installed for you when .venv is first created. This is for
+# afterwards: edit the file, run `pi`, done. Syncing on every `py` instead would
+# put a pip resolve in front of every command, including `py -c 'print(1)'`.
+#
+# Not a bare `pip` on PATH: that would shadow the system pip in every directory,
+# including ones where you do not want a container anywhere near your work.
+
+set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/run.sh"
+
+version="$(dr_setting .python-version .python.version 2>/dev/null || echo "${PYTHON_VERSION:-3.12}")"
+image="python:${version}-slim"
+
+read -r -d '' tail_script <<'SCRIPT' || true
+if [ "$#" -eq 0 ]; then
+  if [ ! -f requirements.txt ]; then
+    echo "pi: no requirements.txt here, and no packages named." >&2
+    echo "    pi <package>...   to install something specific" >&2
+    exit 2
+  fi
+  echo "docker-run: installing requirements.txt" >&2
+  exec .venv/bin/pip install -r requirements.txt
+fi
+exec .venv/bin/pip install "$@"
+SCRIPT
+
+script="$(dr_venv_prep)
+$tail_script"
+
+dr_exec "$image" "$script" "$@"

@@ -16,8 +16,10 @@ docker-run doctor     # which engine, and does it actually work
 ```bash
 py                    # REPL
 py script.py          # run a script
-py -m pip install requests
 py -m pytest
+
+pi                    # install requirements.txt
+pi requests httpx     # install specific packages
 
 ts                    # REPL
 ts script.ts          # run TypeScript directly — no build step, no tsconfig needed
@@ -33,6 +35,15 @@ time. Here installs land in the project directory and stay:
 | where packages live | `.venv/` | `node_modules/` |
 | created on | first `py` in the directory | first `ts` in the directory |
 | seeded from | `requirements.txt` | `package.json` |
+
+`requirements.txt` is installed for you when `.venv` is first created. After that,
+edit it and run `pi`. Syncing on every `py` instead would put a pip resolve in
+front of every command, including `py -c 'print(1)'`.
+
+`pi` is crun.d's command with crun.d's meaning — bare `pi` installs
+`requirements.txt` — and also takes package names. There is deliberately no bare
+`pip` on `PATH`: that would shadow the system pip in every directory, including
+ones where you want nothing to do with a container.
 
 `node_modules` rather than something venv-shaped because node already keeps
 packages per directory — anything else would be fighting npm instead of using it.
