@@ -22,6 +22,9 @@ py -m pytest
 pi                    # install requirements.txt
 pi requests httpx     # install specific packages
 
+ni                    # install package.json
+ni zod date-fns       # install specific packages
+
 ts                    # REPL
 ts script.ts          # run TypeScript directly — no build step, no tsconfig needed
 ```
@@ -43,8 +46,11 @@ edit it and run `pi`. Syncing on every `py` instead would put a pip resolve in
 front of every command, including `py -c 'print(1)'`.
 
 Bare `pi` installs `requirements.txt`; given package names it installs those.
-There is deliberately no bare `pip` on `PATH`: that would shadow the system pip in
-every directory, including ones where you want nothing to do with a container.
+`ni` is its TypeScript counterpart for `package.json`.
+
+There is deliberately no bare `pip` or `npm` on `PATH`: either would shadow the
+host's in every directory, including ones where a container has no business being
+involved.
 
 `node_modules` rather than something venv-shaped because node already keeps
 packages per directory — anything else would be fighting npm instead of using it.
